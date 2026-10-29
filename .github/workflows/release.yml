@@ -1,0 +1,43 @@
+name: Release binaries
+
+# When a release is published, builds the binaries and attaches them to it, with a .sha256 file
+# for each, so the install line in the README can fetch the right one.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Build
+        run: scripts/build-release.sh
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" build/*.tar.gz build/*.tar.gz.sha256 --clobber
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Build static binaries
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src swift:6.1.2-noble bash -c '
+            swift sdk install https://download.swift.org/swift-6.1.2-release/static-sdk/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz \
+              --checksum df0b40b9b582598e7e3d70c82ab503fd6fbfdff71fd17e7f1ab37115a0665b3b &&
+            scripts/build-release.sh linux'
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: sudo chown -R "$USER" build && gh release upload "$TAG" build/*.tar.gz build/*.tar.gz.sha256 --clobber

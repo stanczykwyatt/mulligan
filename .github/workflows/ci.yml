@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # What mulligan must never do, checked line by line in the source and again with calls split
+  # across lines joined.
+  NETWORK: 'URLSession|URLRequest|NWConnection|NWListener|NWPathMonitor|CFSocket|CFStream|NSURLConnection|CFHTTP|getaddrinfo|gethostbyname|\bsocket\(|\bconnect\(|\bsendto\(|URL\(string|https?://|openURL|NSWorkspace|dlopen|dlsym'
+  # Git commands that change the work tree or talk to other repositories, as the first word of a
+  # git call's arguments. Files are only ever changed by the one `read-tree -m -u` in Restore.swift.
+  GIT_WRITES: '\[ *"(checkout|reset|clean|stash|merge|rebase|apply|am|switch|restore|rm|mv|worktree|push|fetch|pull|clone|remote|submodule|filter-branch|lfs)"'
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build the release binary
+        run: scripts/build-release.sh
+
+      - name: Check it never uses the network
+        run: |
+          if grep -rnE "$NETWORK" Sources; then
+            echo "::error::mulligan must not use the network or load code at run time."
+            exit 1
+          fi
+          joined="$(find Sources -name '*.swift' -exec cat {} + | perl -0pe 's/\(\s+/(/g; s/\s*\n\s*\././g')"
+          if grep -E "$NETWORK" <<< "$joined"; then
+            echo "::error::A call split across lines matches the network check."
+            exit 1
+          fi
+          echo "No networking."
+
+      - name: Check files are only changed in one place
+        run: |
+          if grep -rnE "$GIT_WRITES" Sources; then
+            echo "::error::mulligan must not run git commands that change the work tree or reach other repositories."
+            exit 1
+          fi
+          found="$(grep -rn '"read-tree", "-m", "-u"' Sources)"
+          if [ "$(grep -c . <<< "$found")" -ne 1 ] || ! grep -q '^Sources/UndoCore/Restore.swift:' <<< "$found"; then
+            echo "$found"
+            echo "::error::Only Restore.swift changes project files, with exactly one read-tree -m -u."
+            exit 1
+          fi
+          # Programs are started in two places only: git, from Git.swift, and the command you
+          # give `mulligan run`, from Runner.swift.
+          check() {
+            local pattern="$1" file="$2" what="$3"
+            found="$(grep -rnE "$pattern" Sources | grep -v "^Sources/$file:" || true)"
+            if [ -n "$found" ]; then
+              echo "$found"
+              echo "::error::Only $file may $what."
+              exit 1
+            fi
+          }
+          check '\bProcess\(\)' UndoCore/Git.swift 'start git'
+          check 'posix_spawn|\bfork\(|\bexec[lv]p?e?\(|\bsystem\(|popen' mulligan/Runner.swift 'start the command given to run'
+          echo "Files change only through Restore.swift; programs start only from Git.swift and Runner.swift."
+
+      - name: Check what the binary links and calls
+        run: |
+          binary=build/mulligan
+          if otool -L "$binary" | tail -n +2 | grep -E 'Network\.framework|CFNetwork|WebKit|Security\.framework|OSAKit|ScriptingBridge'; then
+            echo "::error::mulligan must not link networking, web or scripting frameworks."
+            exit 1
+          fi
+          for arch in arm64 x86_64; do
+            if nm -u -arch "$arch" "$binary" | grep -E '^_(socket|connect|sendto|getaddrinfo|gethostbyname|dlopen|dlsym|system|popen)$|URLSession|NSURLConnection|NWConnection'; then
+              echo "::error::The $arch binary imports something mulligan must never call."
+              exit 1
+            fi
+          done
+          echo "Links and imports nothing it shouldn't."
+
+      - name: Check there are no dependencies
+        run: |
+          if grep -nE '\.package\(|binaryTarget|\.plugin\(|unsafeFlags|linkerSettings|linkedLibrary|linkedFramework' Package.swift; then
+            echo "::error::mulligan has no dependencies, so every line that runs is in this repository."
+            exit 1
+          fi
+          echo "No dependencies."
+
+  linux:
+    runs-on: ubuntu-24.04
+    container: swift:6.1.2-noble
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build static binaries
+        run: |
+          swift sdk install https://download.swift.org/swift-6.1.2-release/static-sdk/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz \
+            --checksum df0b40b9b582598e7e3d70c82ab503fd6fbfdff71fd17e7f1ab37115a0665b3b
+          scripts/build-release.sh linux
+          ldd .build/x86_64-swift-linux-musl/release/mulligan 2>&1 | grep -qE 'not a dynamic executable|statically linked'
+          .build/x86_64-swift-linux-musl/release/mulligan --version
