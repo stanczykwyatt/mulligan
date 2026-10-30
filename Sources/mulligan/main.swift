@@ -1,10 +1,12 @@
 import Foundation
 import UndoCore
 
+// Glibc and Musl declare `stdout` as a plain mutable global, which Swift 6 rejects unless the
+// module is imported with @preconcurrency. It's only touched here, before anything else runs.
 #if canImport(Glibc)
-import Glibc
+@preconcurrency import Glibc
 #elseif canImport(Musl)
-import Musl
+@preconcurrency import Musl
 #endif
 
 setvbuf(stdout, nil, _IOLBF, 0)
