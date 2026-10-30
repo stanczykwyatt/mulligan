@@ -94,11 +94,12 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     container: swift:6.1.2-noble
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run tests
-        run: swift test
+        run: swift test --no-parallel
 
       - name: Build static binaries
         run: |
