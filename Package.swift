@@ -12,7 +12,9 @@ let package = Package(
         // and putting files back, with nothing tied to the terminal, so it can all be tested in
         // temporary folders with real git.
         .target(name: "UndoCore"),
-        .executableTarget(name: "mulligan", dependencies: ["UndoCore"]),
+        // One C function, for the one thing Swift 6 can't do on Linux: change stdout's buffering.
+        .target(name: "LineBuffer"),
+        .executableTarget(name: "mulligan", dependencies: ["UndoCore", "LineBuffer"]),
         // The tests run the command line tool too, so it's listed here to be built first.
         .testTarget(name: "UndoCoreTests", dependencies: ["UndoCore", "mulligan"]),
     ]
