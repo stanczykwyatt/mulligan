@@ -26,7 +26,7 @@ swift build -c release         # build .build/release/mulligan
 scripts/build-release.sh       # a universal Mac binary and archives in ./build
 ```
 
-`Sources/UndoCore` holds everything: finding the project (`Project.swift`), the snapshot store and its lock (`Store.swift`), taking snapshots (`Snapshots.swift`), undo, redo and restore (`Restore.swift`), limits (`Maintenance.swift`), reading hook payloads (`Hooks.swift`) and the setup text (`Setup.swift`). `Sources/mulligan` is the command line on top of it, with `run` and `watch` in `Runner.swift`. `Sources/LineBuffer` is one C function that line-buffers standard output, which Swift 6 can't do on Linux.
+`Sources/UndoCore` holds everything: finding the project (`Project.swift`), the snapshot store and its lock (`Store.swift`), taking snapshots (`Snapshots.swift`), undo, redo and restore (`Restore.swift`), limits (`Maintenance.swift`), reading hook payloads (`Hooks.swift`) and the setup text (`Setup.swift`). `Sources/mulligan` is the command line on top of it, with `run` and `watch` in `Runner.swift`. `Sources/StartUp` is one C function, run first, that line-buffers standard output and clears any signal mask mulligan inherited.
 
 The tests use real git and real files, always in a new temporary folder with its own HOME and data folder, so they never read your agent configs, your git config or any of your projects. They cover edits, deletes, renames, binary files, symlinks, `.gitignore`, nested repositories and submodules, odd file names, a dirty index and stash in the project (checked byte for byte afterwards), concurrent hooks, a full disk and the size limits.
 
