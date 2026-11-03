@@ -57,38 +57,53 @@
   }
   </script>
   <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "How do I undo changes Codex made to my files?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Install mulligan and add the Codex hooks it prints with mulligan setup codex. It then snapshots your project at each prompt and before each tool. After a turn, mulligan list shows the snapshots and mulligan undo puts your files back to any of them, including changes Codex made with shell commands." }
-      },
-      {
-        "@type": "Question",
-        "name": "Does Claude Code's rewind undo changes made by Bash commands?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Claude Code's checkpoints track its own file edits, and its documentation says files changed only by Bash commands aren't tracked. mulligan snapshots the files themselves from Claude Code's hooks, so changes made by commands are covered too." }
-      },
-      {
-        "@type": "Question",
-        "name": "Does mulligan change my git repository?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. Snapshots live in a separate git repository in mulligan's own data folder, with your project as its work tree. It never commits, stages, stashes or checks out anything in your repository, and never changes its .git folder." }
-      },
-      {
-        "@type": "Question",
-        "name": "Which coding agents does mulligan work with?",
-        "acceptedAnswer": { "@type": "Answer", "text": "It has hooks for Codex CLI, Claude Code, Gemini CLI, OpenCode, Cursor's agent, GitHub Copilot CLI, Qwen Code and Pi. Any other agent, such as Aider, works through mulligan run, which snapshots whenever files change while the agent runs." }
-      },
-      {
-        "@type": "Question",
-        "name": "Can an undo lose my work?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Every undo, redo and restore takes a snapshot of your files first, and stops without changing anything if it can't. It only replaces or removes files that snapshot holds, so anything it changes can be changed back. Ignored files, very large files and nested repositories are left alone." }
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I undo what Codex did?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Add the hooks that mulligan setup codex prints (Codex 0.124 or later), and trust them in /hooks. After a turn, mulligan list shows the snapshots and mulligan undo 2 goes back to one. On older versions, mulligan run -- codex works too."
       }
-    ]
-  }
-  </script>
+    },
+    {
+      "@type": "Question",
+      "name": "Claude Code and Gemini CLI have checkpoints already. Why this?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Their checkpoints follow the agent's own file edits. Claude Code's docs say files changed only by Bash commands aren't tracked, and Gemini's rewind doesn't undo shell changes. mulligan snapshots the files themselves, and works the same across every agent you use."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it mess with my git repository?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. It never commits, stages, stashes or checks out anything there, and never changes its .git. You can use it with uncommitted work and a dirty index. SECURITY.md explains how."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What about node_modules and .env?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Anything in .gitignore isn't snapshotted, and an undo never touches it. That keeps snapshots small, and secrets in ignored files out of them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much space and time does it take?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Each snapshot stores only the files that changed, compressed. Snapshots are capped at 500, 30 days and 2 GB per project by default. A snapshot takes about a tenth of a second for a project of 5,000 files."
+      }
+    }
+  ]
+}
+</script>
 
   <style>
     :root {
